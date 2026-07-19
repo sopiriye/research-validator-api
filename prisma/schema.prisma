@@ -1,0 +1,359 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// PostgreSQL migration notes:
+/// - Enable pgcrypto for gen_random_uuid().
+/// - Enable pg_trgm for trigram title candidate retrieval.
+/// - Add CHECK constraints for year ranges, positive version numbers, login
+///   attempts, and token/session expiry windows in SQL migrations.
+/// - Prisma cannot represent partial indexes. Add the filtered pg_trgm indexes
+///   documented in docs/database/db_schema.dbml through SQL migrations.
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+
+  @@map("admin_role")
+}
+
+enum AdminStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+
+  @@map("admin_status")
+}
+
+enum ProgrammeCode {
+  PGD
+  MSC
+  PHD
+
+  @@map("programme_code")
+}
+
+enum ProjectRecordStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+
+  @@map("project_record_status")
+}
+
+enum ValidationResultStatus {
+  EXACT_FOUND
+  SIMILAR_FOUND
+  NO_MATCH_FOUND
+  VALIDATION_FAILED
+
+  @@map("validation_result_status")
+}
+
+enum MatchType {
+  EXACT
+  SIMILAR
+
+  @@map("match_type")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  ARCHIVE
+  UNARCHIVE
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PASSWORD_CHANGED
+  ADMIN_ACTIVATED
+  ADMIN_DEACTIVATED
+  SETTINGS_UPDATED
+
+  @@map("audit_action")
+}
+
+enum AuditEntityType {
+  ADMIN
+  PROJECT_RECORD
+  DEPARTMENT
+  PROGRAMME
+  SYSTEM_SETTING
+  AUTH_SESSION
+
+  @@map("audit_entity_type")
+}
+
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+
+  @@map("session_status")
+}
+
+enum SettingValueType {
+  STRING
+  INTEGER
+  DECIMAL
+  BOOLEAN
+  JSON
+
+  @@map("setting_value_type")
+}
+
+model Department {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String    @db.VarChar(200)
+  code            String    @unique(map: "uq_departments_code") @db.VarChar(50)
+  description     String?   @db.Text
+  institutionName String    @default("Ignatius Ajuru University of Education") @map("institution_name") @db.VarChar(255)
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  programmes     Programme[]
+  admins         Admin[]
+  projectRecords ProjectRecord[]
+  auditLogs      AuditLog[]
+
+  @@index([name], map: "idx_departments_name")
+  @@index([isActive], map: "idx_departments_is_active")
+  @@index([deletedAt], map: "idx_departments_deleted_at")
+  @@map("departments")
+}
+
+model Programme {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  departmentId String        @map("department_id") @db.Uuid
+  code         ProgrammeCode
+  displayName  String        @map("display_name") @db.VarChar(100)
+  description  String?       @db.Text
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  department            Department             @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  projectRecords        ProjectRecord[]
+  projectRecordVersions ProjectRecordVersion[]
+
+  @@unique([departmentId, code], map: "uq_programmes_department_code")
+  @@index([departmentId], map: "idx_programmes_department_id")
+  @@index([code], map: "idx_programmes_code")
+  @@index([isActive], map: "idx_programmes_is_active")
+  @@index([deletedAt], map: "idx_programmes_deleted_at")
+  @@map("programmes")
+}
+
+model Admin {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  departmentId        String      @map("department_id") @db.Uuid
+  fullName            String      @map("full_name") @db.VarChar(200)
+  email               String      @unique(map: "uq_admins_email") @db.VarChar(320)
+  passwordHash        String      @map("password_hash") @db.VarChar(255)
+  role                AdminRole   @default(ADMIN)
+  status              AdminStatus @default(ACTIVE)
+  mustChangePassword  Boolean     @default(false) @map("must_change_password")
+  failedLoginAttempts Int         @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?   @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt         DateTime?   @map("last_login_at") @db.Timestamptz(6)
+  passwordChangedAt   DateTime?   @map("password_changed_at") @db.Timestamptz(6)
+  createdByAdminId    String?     @map("created_by_admin_id") @db.Uuid
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?   @map("deleted_at") @db.Timestamptz(6)
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  createdByAdmin Admin?  @relation("AdminCreatedAdmins", fields: [createdByAdminId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdAdmins  Admin[] @relation("AdminCreatedAdmins")
+
+  sessions            AdminSession[]
+  passwordResetTokens PasswordResetToken[]
+
+  createdProjectRecords ProjectRecord[] @relation("ProjectRecordCreatedByAdmin")
+  updatedProjectRecords ProjectRecord[] @relation("ProjectRecordUpdatedByAdmin")
+  deletedProjectRecords ProjectRecord[] @relation("ProjectRecordDeletedByAdmin")
+
+  changedProjectRecordVersions ProjectRecordVersion[]
+  auditLogs                    AuditLog[]
+
+  @@index([departmentId], map: "idx_admins_department_id")
+  @@index([role], map: "idx_admins_role")
+  @@index([status], map: "idx_admins_status")
+  @@index([createdByAdminId], map: "idx_admins_created_by")
+  @@index([deletedAt], map: "idx_admins_deleted_at")
+  @@map("admins")
+}
+
+model AdminSession {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId          String        @map("admin_id") @db.Uuid
+  refreshTokenHash String        @unique(map: "uq_admin_sessions_refresh_token_hash") @map("refresh_token_hash") @db.VarChar(255)
+  jwtIdentifier    String?       @unique(map: "uq_admin_sessions_jwt_identifier") @map("jwt_identifier") @db.VarChar(255)
+  status           SessionStatus @default(ACTIVE)
+  ipAddress        String?       @map("ip_address") @db.Inet
+  userAgent        String?       @map("user_agent") @db.Text
+  deviceName       String?       @map("device_name") @db.VarChar(255)
+  issuedAt         DateTime      @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt        DateTime      @map("expires_at") @db.Timestamptz(6)
+  lastUsedAt       DateTime?     @map("last_used_at") @db.Timestamptz(6)
+  revokedAt        DateTime?     @map("revoked_at") @db.Timestamptz(6)
+  revocationReason String?       @map("revocation_reason") @db.VarChar(255)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([adminId], map: "idx_admin_sessions_admin_id")
+  @@index([status], map: "idx_admin_sessions_status")
+  @@index([expiresAt], map: "idx_admin_sessions_expires_at")
+  @@index([adminId, status], map: "idx_admin_sessions_admin_status")
+  @@map("admin_sessions")
+}
+
+model PasswordResetToken {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId            String    @map("admin_id") @db.Uuid
+  tokenHash          String    @unique(map: "uq_password_reset_tokens_token_hash") @map("token_hash") @db.VarChar(255)
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt             DateTime? @map("used_at") @db.Timestamptz(6)
+  requestedIpAddress String?   @map("requested_ip_address") @db.Inet
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([adminId], map: "idx_password_reset_tokens_admin_id")
+  @@index([expiresAt], map: "idx_password_reset_tokens_expires_at")
+  @@map("password_reset_tokens")
+}
+
+model ProjectRecord {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  departmentId          String              @map("department_id") @db.Uuid
+  programmeId           String              @map("programme_id") @db.Uuid
+  supervisee            String              @db.VarChar(255)
+  projectName           String              @map("project_name") @db.Text
+  normalizedProjectName String              @map("normalized_project_name") @db.Text
+  supervisor            String              @db.VarChar(255)
+  yearOfCompletion      Int                 @map("year_of_completion")
+  serialNumber          String              @map("serial_number") @db.VarChar(100)
+  status                ProjectRecordStatus @default(ACTIVE)
+  createdByAdminId      String              @map("created_by_admin_id") @db.Uuid
+  updatedByAdminId      String?             @map("updated_by_admin_id") @db.Uuid
+  deletedByAdminId      String?             @map("deleted_by_admin_id") @db.Uuid
+  archivedAt            DateTime?           @map("archived_at") @db.Timestamptz(6)
+  deletedAt             DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  department     Department @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  programme      Programme  @relation(fields: [programmeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdByAdmin Admin      @relation("ProjectRecordCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  updatedByAdmin Admin?     @relation("ProjectRecordUpdatedByAdmin", fields: [updatedByAdminId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  deletedByAdmin Admin?     @relation("ProjectRecordDeletedByAdmin", fields: [deletedByAdminId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  versions ProjectRecordVersion[]
+
+  @@unique([departmentId, normalizedProjectName], map: "uq_project_records_department_normalized_name")
+  @@unique([departmentId, serialNumber], map: "uq_project_records_department_serial_number")
+  @@index([departmentId], map: "idx_project_records_department_id")
+  @@index([programmeId], map: "idx_project_records_programme_id")
+  @@index([normalizedProjectName], map: "idx_project_records_normalized_project_name")
+  @@index([normalizedProjectName(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_project_records_normalized_name_trgm")
+  @@index([projectName(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_project_records_project_name_search")
+  @@index([supervisee], map: "idx_project_records_supervisee")
+  @@index([supervisor], map: "idx_project_records_supervisor")
+  @@index([yearOfCompletion], map: "idx_project_records_year_of_completion")
+  @@index([serialNumber], map: "idx_project_records_serial_number")
+  @@index([status], map: "idx_project_records_status")
+  @@index([createdByAdminId], map: "idx_project_records_created_by_admin")
+  @@index([updatedByAdminId], map: "idx_project_records_updated_by_admin")
+  @@index([deletedAt], map: "idx_project_records_deleted_at")
+  @@index([departmentId, programmeId, yearOfCompletion], map: "idx_project_records_department_programme_year")
+  @@index([departmentId, yearOfCompletion, status], map: "idx_project_records_department_year_status")
+  @@map("project_records")
+}
+
+model ProjectRecordVersion {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectRecordId       String              @map("project_record_id") @db.Uuid
+  versionNumber         Int                 @map("version_number")
+  supervisee            String              @db.VarChar(255)
+  projectName           String              @map("project_name") @db.Text
+  normalizedProjectName String              @map("normalized_project_name") @db.Text
+  supervisor            String              @db.VarChar(255)
+  yearOfCompletion      Int                 @map("year_of_completion")
+  programmeId           String              @map("programme_id") @db.Uuid
+  serialNumber          String              @map("serial_number") @db.VarChar(100)
+  status                ProjectRecordStatus
+  changeSummary         String?             @map("change_summary") @db.Text
+  changedByAdminId      String              @map("changed_by_admin_id") @db.Uuid
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  projectRecord  ProjectRecord @relation(fields: [projectRecordId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  programme      Programme     @relation(fields: [programmeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  changedByAdmin Admin         @relation(fields: [changedByAdminId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([projectRecordId, versionNumber], map: "uq_project_record_versions_record_version")
+  @@index([projectRecordId], map: "idx_project_record_versions_project_record_id")
+  @@index([changedByAdminId], map: "idx_project_record_versions_changed_by")
+  @@index([createdAt], map: "idx_project_record_versions_created_at")
+  @@map("project_record_versions")
+}
+
+model AuditLog {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  departmentId  String?         @map("department_id") @db.Uuid
+  adminId       String?         @map("admin_id") @db.Uuid
+  action        AuditAction
+  entityType    AuditEntityType @map("entity_type")
+  entityId      String?         @map("entity_id") @db.Uuid
+  description   String?         @db.Text
+  oldValues     Json?           @map("old_values") @db.JsonB
+  newValues     Json?           @map("new_values") @db.JsonB
+  changedFields Json?           @map("changed_fields") @db.JsonB
+  ipAddress     String?         @map("ip_address") @db.Inet
+  userAgent     String?         @map("user_agent") @db.Text
+  requestMethod String?         @map("request_method") @db.VarChar(10)
+  requestPath   String?         @map("request_path") @db.Text
+  requestId     String?         @map("request_id") @db.VarChar(100)
+  success       Boolean         @default(true)
+  failureReason String?         @map("failure_reason") @db.Text
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  admin      Admin?      @relation(fields: [adminId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([departmentId], map: "idx_audit_logs_department_id")
+  @@index([adminId], map: "idx_audit_logs_admin_id")
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([entityType], map: "idx_audit_logs_entity_type")
+  @@index([entityId], map: "idx_audit_logs_entity_id")
+  @@index([createdAt], map: "idx_audit_logs_created_at")
+  @@index([entityType, entityId, createdAt], map: "idx_audit_logs_entity_history")
+  @@index([adminId, createdAt], map: "idx_audit_logs_admin_activity")
+  @@map("audit_logs")
+}
+
+model SearchLog {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  query             String                 @db.Text
+  normalizedQuery   String                 @map("normalized_query") @db.Text
+  resultStatus      ValidationResultStatus @map("result_status")
+  exactMatchCount   Int                    @default(0) @map("exact_match_count")
+  similarMatchCount Int                    @default(0) @map("similar_match_count")
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([resultStatus], map: "idx_search_logs_result_status")
+  @@index([createdAt], map: "idx_search_logs_created_at")
+  @@map("search_logs")
+}
