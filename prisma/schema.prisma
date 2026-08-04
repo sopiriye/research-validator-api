@@ -246,6 +246,7 @@ model ProjectRecord {
   supervisor            String              @db.VarChar(255)
   yearOfCompletion      Int                 @map("year_of_completion")
   serialNumber          String              @map("serial_number") @db.VarChar(100)
+  abstract              String              @db.Text
   status                ProjectRecordStatus @default(ACTIVE)
   createdByAdminId      String              @map("created_by_admin_id") @db.Uuid
   updatedByAdminId      String?             @map("updated_by_admin_id") @db.Uuid
