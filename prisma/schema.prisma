@@ -23,7 +23,7 @@ enum AdminRole {
 
 enum AdminStatus {
   ACTIVE
-  INACTIVE
+  DISABLED
   SUSPENDED
 
   @@map("admin_status")
