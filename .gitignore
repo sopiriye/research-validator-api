@@ -6,6 +6,9 @@
 # docs
 /docs
 
+#dev seeding
+prisma/seed.cjs
+
 # Logs
 logs
 *.log
