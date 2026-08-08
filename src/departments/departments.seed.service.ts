@@ -14,17 +14,17 @@ export class DepartmentsSeedService implements OnApplicationBootstrap {
   async onApplicationBootstrap(): Promise<void> {
     const department = await this.database.department.upsert({
       where: { code: DEFAULT_DEPARTMENT_CODE },
-      create: {
-        code: DEFAULT_DEPARTMENT_CODE,
-        name: DEFAULT_DEPARTMENT_NAME,
-        institutionName: DEFAULT_INSTITUTION_NAME,
-        description: 'Information Technology Education Department',
-      },
       update: {
         name: DEFAULT_DEPARTMENT_NAME,
         institutionName: DEFAULT_INSTITUTION_NAME,
         isActive: true,
         deletedAt: null,
+      },
+      create: {
+        code: DEFAULT_DEPARTMENT_CODE,
+        name: DEFAULT_DEPARTMENT_NAME,
+        institutionName: DEFAULT_INSTITUTION_NAME,
+        description: 'Information Technology Education Department',
       },
     });
 
