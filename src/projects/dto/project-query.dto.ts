@@ -1,5 +1,13 @@
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { ProgrammeCode } from '@prisma/client';
 import { toProgrammeCode } from '../../common/utils/programme.utils';
 import { trimInput, uppercaseInput } from '../../common/utils/transform.utils';
@@ -23,7 +31,7 @@ export class ProjectQueryDto {
   @Transform(({ value }) => trimInput(value))
   @IsOptional()
   @IsString()
-  @Max(500)
+  @MaxLength(500)
   search?: string;
 
   @Transform(({ value }) => toProgrammeCode(value))
