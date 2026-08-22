@@ -62,9 +62,9 @@ export class UpdateProjectDto {
   @MaxLength(100)
   @Matches(/^[A-Z0-9][A-Z0-9._/-]*$/, {
     message:
-      'Serial number may contain letters, numbers, dots, underscores, slashes, and hyphens only.',
+      'Reg Number may contain letters, numbers, dots, underscores, slashes, and hyphens only.',
   })
-  serialNumber?: string;
+  regNumber?: string;
 
   @IsOptional()
   @IsString()

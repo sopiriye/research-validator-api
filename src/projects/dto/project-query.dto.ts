@@ -49,12 +49,12 @@ export class ProjectQueryDto {
   @Transform(({ value }) => trimInput(value))
   @IsOptional()
   @IsString()
-  @Max(255)
+  @MaxLength(255)
   supervisor?: string;
 
   @Transform(({ value }) => uppercaseInput(value))
   @IsOptional()
   @IsString()
-  @Max(100)
-  serialNumber?: string;
+  @MaxLength(100)
+  regNumber?: string;
 }

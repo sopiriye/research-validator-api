@@ -245,7 +245,7 @@ model ProjectRecord {
   normalizedProjectName String              @map("normalized_project_name") @db.Text
   supervisor            String              @db.VarChar(255)
   yearOfCompletion      Int                 @map("year_of_completion")
-  serialNumber          String              @map("serial_number") @db.VarChar(100)
+  regNumber             String              @map("serial_number") @db.VarChar(100)
   abstract              String              @db.Text
   status                ProjectRecordStatus @default(ACTIVE)
   createdByAdminId      String              @map("created_by_admin_id") @db.Uuid
@@ -265,7 +265,7 @@ model ProjectRecord {
   versions ProjectRecordVersion[]
 
   @@unique([departmentId, normalizedProjectName], map: "uq_project_records_department_normalized_name")
-  @@unique([departmentId, serialNumber], map: "uq_project_records_department_serial_number")
+  @@unique([departmentId, regNumber], map: "uq_project_records_department_serial_number")
   @@index([departmentId], map: "idx_project_records_department_id")
   @@index([programmeId], map: "idx_project_records_programme_id")
   @@index([normalizedProjectName], map: "idx_project_records_normalized_project_name")
@@ -274,7 +274,7 @@ model ProjectRecord {
   @@index([supervisee], map: "idx_project_records_supervisee")
   @@index([supervisor], map: "idx_project_records_supervisor")
   @@index([yearOfCompletion], map: "idx_project_records_year_of_completion")
-  @@index([serialNumber], map: "idx_project_records_serial_number")
+  @@index([regNumber], map: "idx_project_records_serial_number")
   @@index([status], map: "idx_project_records_status")
   @@index([createdByAdminId], map: "idx_project_records_created_by_admin")
   @@index([updatedByAdminId], map: "idx_project_records_updated_by_admin")
@@ -294,7 +294,7 @@ model ProjectRecordVersion {
   supervisor            String              @db.VarChar(255)
   yearOfCompletion      Int                 @map("year_of_completion")
   programmeId           String              @map("programme_id") @db.Uuid
-  serialNumber          String              @map("serial_number") @db.VarChar(100)
+  regNumber             String              @map("serial_number") @db.VarChar(100)
   status                ProjectRecordStatus
   changeSummary         String?             @map("change_summary") @db.Text
   changedByAdminId      String              @map("changed_by_admin_id") @db.Uuid

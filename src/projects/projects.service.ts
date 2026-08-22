@@ -49,7 +49,7 @@ export class ProjectsService {
           tx,
           actor.departmentId,
           normalizedProjectName,
-          dto.serialNumber,
+          dto.regNumber,
         );
         const created = await tx.projectRecord.create({
           data: {
@@ -60,7 +60,7 @@ export class ProjectsService {
             normalizedProjectName,
             supervisor: sanitizePlainText(dto.supervisor),
             yearOfCompletion: dto.yearOfCompletion,
-            serialNumber: dto.serialNumber,
+            regNumber: dto.regNumber,
             abstract,
             createdByAdminId: actor.id,
           },
@@ -100,9 +100,9 @@ export class ProjectsService {
       ...(query.supervisor
         ? { supervisor: { contains: query.supervisor, mode: 'insensitive' } }
         : {}),
-      ...(query.serialNumber
+      ...(query.regNumber
         ? {
-            serialNumber: { contains: query.serialNumber, mode: 'insensitive' },
+            regNumber: { contains: query.regNumber, mode: 'insensitive' },
           }
         : {}),
       ...(query.search
@@ -111,7 +111,7 @@ export class ProjectsService {
               { projectName: { contains: query.search, mode: 'insensitive' } },
               { supervisee: { contains: query.search, mode: 'insensitive' } },
               { supervisor: { contains: query.search, mode: 'insensitive' } },
-              { serialNumber: { contains: query.search, mode: 'insensitive' } },
+              { regNumber: { contains: query.search, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -165,7 +165,7 @@ export class ProjectsService {
           ? this.titleNormalization.normalize(nextProjectName)
           : existing.normalizedProjectName;
         this.assertNormalizedTitle(nextNormalizedName);
-        const nextSerialNumber = dto.serialNumber ?? existing.serialNumber;
+        const nextRegNumber = dto.regNumber ?? existing.regNumber;
         let programmeId = existing.programmeId;
         if (dto.programme) {
           programmeId = (
@@ -184,7 +184,7 @@ export class ProjectsService {
           tx,
           actor.departmentId,
           nextNormalizedName,
-          nextSerialNumber,
+          nextRegNumber,
           id,
         );
         await this.writeVersion(
@@ -210,7 +210,7 @@ export class ProjectsService {
                 : undefined,
             yearOfCompletion: dto.yearOfCompletion,
             programmeId,
-            serialNumber: dto.serialNumber,
+            regNumber: dto.regNumber,
             abstract: nextAbstract,
             updatedByAdminId: actor.id,
           },
@@ -320,25 +320,25 @@ export class ProjectsService {
     tx: Prisma.TransactionClient,
     departmentId: string,
     normalizedProjectName: string,
-    serialNumber: string,
+    regNumber: string,
     excludingId?: string,
   ): Promise<void> {
     const duplicate = await tx.projectRecord.findFirst({
       where: {
         departmentId,
-        OR: [{ normalizedProjectName }, { serialNumber }],
+        OR: [{ normalizedProjectName }, { regNumber }],
         ...(excludingId ? { id: { not: excludingId } } : {}),
       },
-      select: { normalizedProjectName: true, serialNumber: true },
+      select: { normalizedProjectName: true, regNumber: true },
     });
     if (duplicate?.normalizedProjectName === normalizedProjectName) {
       throw new ConflictException(
         'A project record with this normalized title already exists.',
       );
     }
-    if (duplicate?.serialNumber === serialNumber) {
+    if (duplicate?.regNumber === regNumber) {
       throw new ConflictException(
-        'A project record with this serial number already exists.',
+        'A project record with this Reg Number already exists.',
       );
     }
   }
@@ -363,7 +363,7 @@ export class ProjectsService {
         supervisor: record.supervisor,
         yearOfCompletion: record.yearOfCompletion,
         programmeId: record.programmeId,
-        serialNumber: record.serialNumber,
+        regNumber: record.regNumber,
         status: record.status,
         changeSummary,
         changedByAdminId: adminId,
@@ -398,7 +398,7 @@ export class ProjectsService {
       supervisor: record.supervisor,
       yearOfCompletion: record.yearOfCompletion,
       programme: toProgrammeLabel(record.programme.code),
-      serialNumber: record.serialNumber,
+      regNumber: record.regNumber,
     };
   }
 
@@ -420,7 +420,7 @@ export class ProjectsService {
       supervisor: record.supervisor,
       yearOfCompletion: record.yearOfCompletion,
       programmeId: record.programmeId,
-      serialNumber: record.serialNumber,
+      regNumber: record.regNumber,
       status: record.status,
     };
   }
@@ -431,7 +431,7 @@ export class ProjectsService {
       error.code === 'P2002'
     ) {
       throw new ConflictException(
-        'A project record with this title or serial number already exists.',
+        'A project record with this title or Reg Number already exists.',
       );
     }
     throw error;
